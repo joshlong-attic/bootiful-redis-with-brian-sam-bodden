@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.data.geo.*;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.GeoOperations;
+import org.springframework.data.redis.core.ReactiveGeoOperations;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import reactor.core.publisher.Flux;
 
@@ -22,28 +23,31 @@ public class BasicsApplication {
 
 
     @Bean
-    ApplicationRunner geography(ReactiveRedisTemplate<String, String> template) {
+    ReactiveGeoOperations<String, String> geoOperations(ReactiveRedisTemplate<String, String> reactiveRedisTemplate) {
+        return reactiveRedisTemplate.opsForGeo();
+    }
+
+    @Bean
+    ApplicationRunner geography(ReactiveGeoOperations<String, String> geographyTemplate) {
         return args -> {
             var sicily = "Sicily";
-            var geographyTemplate = template.opsForGeo();
-
             var mapOfPoints = Map.of(
                     "Arigento", new Point(13.361389, 38.1155556),
                     "Catania", new Point(15.087269, 37.502669),
                     "Palermo", new Point(13.583333, 37.316667)
             );
-            mapOfPoints.forEach((k, v) -> geographyTemplate.add(sicily, v, k).block());
-            var circle = new Circle(
-                    new Point(13.583333, 37.316667),
-                    new Distance(10, RedisGeoCommands.DistanceUnit.KILOMETERS)
-            );
-            geographyTemplate
-                    .radius(sicily, circle)
+            Flux
+                    .fromIterable(mapOfPoints.entrySet())
+                    .flatMap(e -> geographyTemplate.add(sicily, e.getValue(), e.getKey()))
+                    .thenMany(geographyTemplate.radius(sicily, new Circle(
+                                    new Point(13.583333, 37.316667),
+                                    new Distance(10, RedisGeoCommands.DistanceUnit.KILOMETERS)
+                            ))
+                    )
                     .map(GeoResult::getContent)
+                    .map(RedisGeoCommands.GeoLocation::getName)
                     .doOnNext(System.out::println)
                     .subscribe();
-
-
         };
     }
 
