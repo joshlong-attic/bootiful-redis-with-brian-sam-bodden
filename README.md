@@ -1,1 +1,1 @@
-# bootiful-redis-with-brian-sam-bodden
+# Bootiful Redis with Brian Sam Bodden
