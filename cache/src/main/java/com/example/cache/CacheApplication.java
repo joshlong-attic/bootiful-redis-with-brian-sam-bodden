@@ -57,7 +57,6 @@ class DefaultExpensiveService implements ExpensiveService {
         Thread.sleep(1000 * 10);
         return new Response("result for " + input + " is " + System.currentTimeMillis());
     }
-
 }
 
 
