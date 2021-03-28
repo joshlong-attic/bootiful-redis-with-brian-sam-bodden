@@ -12,47 +12,49 @@ import org.springframework.security.core.userdetails.MapReactiveUserDetailsServi
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 
-// curl -u rwinch:pw http://localhost:8080/proxy -v
 @SpringBootApplication
 public class GatewayApplication {
 
-	@Bean
-	RedisRateLimiter redisRateLimiter() {
-		return new RedisRateLimiter(5, 7);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(GatewayApplication.class, args);
+    }
 
-	@Bean
-	RouteLocator gateway(RouteLocatorBuilder rlb) {
-		return
-			rlb
-				.routes()
-				.route(rs -> rs
-					.path("/proxy")
-					.filters(fs -> fs
-						.requestRateLimiter(rlc -> rlc.setRateLimiter(redisRateLimiter()))
-						.setPath("/")
-					)
-					.uri("https://start.spring.io"))
-				.build();
-	}
+    @Bean
+    RedisRateLimiter redisRateLimiter() {
+        return new RedisRateLimiter(5, 7);
+    }
 
-	@Bean
-	SecurityWebFilterChain authorization(ServerHttpSecurity http) {
-		return http
-			.authorizeExchange(ae -> ae.anyExchange().authenticated())
-			.csrf(ServerHttpSecurity.CsrfSpec::disable)
-			.httpBasic(Customizer.withDefaults())
-			.build();
-	}
+    @Bean
+    SecurityWebFilterChain authorization(ServerHttpSecurity http) {
+        return http
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .httpBasic(Customizer.withDefaults())
+                .authorizeExchange(ae -> ae.anyExchange().authenticated())
+                .build();
+    }
 
-	@Bean
-	MapReactiveUserDetailsService authentication() {
-		return new MapReactiveUserDetailsService(
-			User.withDefaultPasswordEncoder().username("rwinch").password("pw").roles("USER").build());
-	}
+    @Bean
+    MapReactiveUserDetailsService authentication() {
+        return new MapReactiveUserDetailsService(User.withDefaultPasswordEncoder().username("jlong").roles("USER").password("pw").build());
+    }
 
-	public static void main(String[] args) {
-		SpringApplication.run(GatewayApplication.class, args);
-	}
+    @Bean
+    RouteLocator gateway(RouteLocatorBuilder rlb) {
+        return
+                rlb
+                        .routes()
+                        .route(rs -> rs
+                                .path("/proxy")
+                                .filters(fs -> fs
+                                        .setPath("/")
+                                        .requestRateLimiter(rlc -> rlc
+                                                .setRateLimiter(redisRateLimiter())
+                                        )
+                                )
+                                .uri("https://start.spring.io")
+                        )
+                        .build();
+    }
+
 
 }
