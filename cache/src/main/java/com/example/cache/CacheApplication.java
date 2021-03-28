@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StopWatch;
 
 import java.io.Serializable;
+import java.time.Instant;
 
 @EnableCaching
 @SpringBootApplication
@@ -23,42 +24,40 @@ public class CacheApplication {
     }
 
     @Bean
-    ApplicationRunner runner(ExpensiveService expensiveService) {
-        return args -> {
+    ApplicationRunner applicationRunner(ExpensiveService es) {
+        return event -> {
+
             var sw = new StopWatch();
-            var input = Math.random() * 10000;
-            time(expensiveService, sw, input);
-            time(expensiveService, sw, input);
+            var input = 42;
+            time(es, sw, input);
+            time(es, sw, input);
+
         };
     }
 
-    private static Response time(
-            ExpensiveService expensiveService,
-            StopWatch sw, double input) {
+    private static Response time(ExpensiveService es,
+                                 StopWatch sw, double input) {
         sw.start();
-        var result = expensiveService.doLongRunningTaskGivenInput(input);
+        Response response = es.performExpensiveCalculation(input);
         sw.stop();
-        System.out.println("the result is " + result + " and it took " + sw.getLastTaskTimeMillis());
-        return result;
+        System.out.println("got response " + response.toString() + " after " + sw.getLastTaskTimeMillis());
+        return response;
     }
 
 }
 
-interface ExpensiveService {
-    Response doLongRunningTaskGivenInput(double d);
-}
 
 @Service
-class DefaultExpensiveService implements ExpensiveService {
+class ExpensiveService {
 
     @SneakyThrows
     @Cacheable("expensive")
-    public Response doLongRunningTaskGivenInput(double input) {
-        Thread.sleep(1000 * 10);
-        return new Response("result for " + input + " is " + System.currentTimeMillis());
+    public Response performExpensiveCalculation(double input) {
+        Thread.sleep(10 * 1000);
+        return new Response("response from input " + input + " @ " + Instant.now());
     }
-}
 
+}
 
 @Data
 @RequiredArgsConstructor
