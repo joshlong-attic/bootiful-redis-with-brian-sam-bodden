@@ -9,7 +9,6 @@ import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
 import org.springframework.data.geo.Point;
 import org.springframework.data.redis.connection.RedisGeoCommands;
-import org.springframework.data.redis.core.ReactiveGeoOperations;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import reactor.core.publisher.Flux;
 
@@ -22,52 +21,44 @@ public class BasicsApplication {
         SpringApplication.run(BasicsApplication.class, args);
     }
 
-
     @Bean
-    ReactiveGeoOperations<String, String> geoOperations(ReactiveRedisTemplate<String, String> reactiveRedisTemplate) {
-        return reactiveRedisTemplate.opsForGeo();
-    }
-
-    @Bean
-    ApplicationRunner geography(ReactiveGeoOperations<String, String> geographyTemplate) {
+    ApplicationRunner geography(ReactiveRedisTemplate<String, String> template) {
         return args -> {
+
             var sicily = "Sicily";
+            var geoTemplate = template.opsForGeo();
             var mapOfPoints = Map.of(
-                    "Arigento", new Point(13.361389, 38.1155556),
-                    "Catania", new Point(15.087269, 37.502669),
-                    "Palermo", new Point(13.583333, 37.316667)
+                    "Arigento", new Point(13.361389, 38.11555556),
+                    "Catania", new Point(15.0876269, 37.502669),
+                    "Palermo", new Point(13.5833333, 37.316667)
             );
-            Flux
-                    .fromIterable(mapOfPoints.entrySet())
-                    .flatMap(e -> geographyTemplate.add(sicily, e.getValue(), e.getKey()))
-                    .thenMany(geographyTemplate.radius(sicily, new Circle(
-                                    new Point(13.583333, 37.316667),
-                                    new Distance(10, RedisGeoCommands.DistanceUnit.KILOMETERS)
-                            ))
-                    )
+            Flux.fromIterable(mapOfPoints.entrySet())
+                    .flatMap(e -> geoTemplate.add(sicily, e.getValue(), e.getKey()))
+                    .thenMany(geoTemplate.radius(sicily, new Circle(
+                            new Point(13.583333, 37.31667),
+                            new Distance(10, RedisGeoCommands.DistanceUnit.KILOMETERS)
+                    )))
                     .map(GeoResult::getContent)
                     .map(RedisGeoCommands.GeoLocation::getName)
                     .doOnNext(System.out::println)
                     .subscribe();
+
         };
     }
 
     @Bean
     ApplicationRunner list(ReactiveRedisTemplate<String, String> template) {
-        return event -> {
+        return args -> {
+            var listTemplate = template.opsForList();
             var listName = "spring-team";
-            var operations = template.opsForList();
-            var push = operations.leftPushAll(listName,
-                    "Madhura", "Stéphane", "Dr. Syer", "Spencer",
-                    "Olga", "Andy", "Yuxin", "Costin", "Violetta"
-            );
+            var push = listTemplate.leftPushAll(listName, "Madhura", "Josh", "Stéphane", "Dr. Syer", "Yuxin", "Olga", "Violetta");
             push
-                    .thenMany(push)
-                    .thenMany(operations.leftPop(listName))
-                    .doOnNext(s -> System.out.println("got " + s))
-                    .thenMany(operations.leftPop(listName))
-                    .doOnNext(s -> System.out.println("got " + s))
+                    .thenMany(listTemplate.leftPop(listName))
+                    .doOnNext(System.out::println)
+                    .thenMany(listTemplate.leftPop(listName))
+                    .doOnNext(System.out::println)
                     .subscribe();
         };
     }
+
 }
