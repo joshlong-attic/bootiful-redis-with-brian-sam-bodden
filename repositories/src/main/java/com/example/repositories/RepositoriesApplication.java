@@ -14,71 +14,53 @@ import org.springframework.data.redis.core.index.Indexed;
 import org.springframework.data.repository.CrudRepository;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.Collection;
+import java.util.Date;
+import java.util.List;
+import java.util.Random;
 
 @SpringBootApplication
 public class RepositoriesApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(RepositoriesApplication.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(RepositoriesApplication.class, args);
+    }
 
-	private Long generateId() {
-		long tmp = new Random().nextLong();
-		return Math.max(tmp, tmp * -1);
-	}
 
-	@Bean
-	ApplicationRunner repositories(
-		OrderRepository orderRepository,
-		LineItemRepository lineItemRepository) {
+    private static Long generateId() {
+        var tmp = new Random()
+                .nextLong();
+        return Math.max(tmp, tmp * -1);
+    }
 
-		return rgs -> {
+    @Bean
+    ApplicationRunner runner(OrderRepository or, LineItemRepository lir) {
+        return args -> {
 
-			Long orderId = generateId();
+            var orderId = generateId();
+            var items = List.of(
+                    new LineItem(orderId, generateId(), "plunger"),
+                    new LineItem(orderId, generateId(), "soup"),
+                    new LineItem(orderId, generateId(), "coffee mug"));
+            items.stream().map(lir::save).forEach(System.out::println);
 
-			List<LineItem> itemList = Arrays.asList(
-				new LineItem(orderId, generateId(), "plunger"),
-				new LineItem(orderId, generateId(), "soup"),
-				new LineItem(orderId, generateId(), "coffee mug"));
-			itemList
-				.stream()
-				.map(lineItemRepository::save)
-				.forEach(li -> System.out.println( li.toString()));
+            var order = new Order(orderId, new Date(), items);
+            or.save(order);
 
-			Order order = new Order(orderId, new Date(), itemList);
-			orderRepository.save(order);
+            var results = or.findByWhen(order.getWhen());
+            results.forEach(System.out::println);
 
-			Collection<Order> found = orderRepository.findByWhen(order.getWhen());
-			found.forEach(o -> System.out.println( "found: " + o));
-		};
-	}
+        };
+    }
 
 }
-
 
 interface OrderRepository extends CrudRepository<Order, Long> {
-	Collection<Order> findByWhen(Date d);
-}
 
+    Collection<Order> findByWhen(Date d);
+}
 
 interface LineItemRepository extends CrudRepository<LineItem, Long> {
-}
-
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
-@RedisHash("orders")
-class Order implements Serializable {
-
-	@Id
-	private Long id;
-
-	@Indexed
-	private Date when;
-
-	@Reference
-	private List<LineItem> lineItems;
 }
 
 @RedisHash("lineItems")
@@ -87,13 +69,31 @@ class Order implements Serializable {
 @NoArgsConstructor
 class LineItem implements Serializable {
 
-	@Indexed
-	private Long orderId;
 
-	@Id
-	private Long id;
+    @Id
+    private Long id;
 
-	private String description;
+    @Indexed
+    private Long orderId;
+
+    private String description;
+
 }
 
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@RedisHash("orders")
+class Order implements Serializable {
 
+    @Id
+    private Long id;
+
+    @Indexed
+    private Date when;
+
+    @Reference
+    private List<LineItem> lineItems;
+
+
+}
